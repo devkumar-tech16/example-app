@@ -1,0 +1,90 @@
+import requests
+from bs4 import BeautifulSoup
+import pandas as pd
+from datetime import datetime
+
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+    "Accept-Language": "en-IN,en;q=0.9"
+}
+
+def get_amazon_price(url):
+    try:
+        response = requests.get(url, headers=HEADERS)
+        soup = BeautifulSoup(response.text, "html.parser")
+
+        title = soup.find(id="productTitle").get_text().strip()
+        price = soup.find("span", class_="a-price-whole").get_text()
+        price = price.replace(",", "").replace(".", "")
+        return title, int(price)
+
+    except:
+        return None, None
+
+
+def get_flipkart_price(url):
+    try:
+        response = requests.get(url, headers=HEADERS)
+        soup = BeautifulSoup(response.text, "html.parser")
+
+        title = soup.find("span", class_="B_NuCI").get_text().strip()
+        price = soup.find("div", class_="_30jeq3 _16Jk6d").get_text()
+        price = price.replace("₹", "").replace(",", "")
+        return title, int(price)
+
+    except:
+        return None, None
+
+
+def save_price(product, amazon_price, flipkart_price):
+    data = {
+        "Date": [datetime.now().strftime("%Y-%m-%d %H:%M:%S")],
+        "Product": [product],
+        "Amazon Price": [amazon_price],
+        "Flipkart Price": [flipkart_price]
+    }
+
+    df = pd.DataFrame(data)
+
+    try:
+        old_df = pd.read_csv("prices.csv")
+        df = pd.concat([old_df, df], ignore_index=True)
+    except:
+        pass
+
+    df.to_csv("prices.csv", index=False)
+
+
+def compare_prices(amazon_price, flipkart_price):
+    if amazon_price < flipkart_price:
+        return "Amazon is cheaper"
+    elif flipkart_price < amazon_price:
+        return "Flipkart is cheaper"
+    else:
+        return "Both prices are same"
+
+
+def main():
+    amazon_url = input("Enter Amazon product URL: ")
+    flipkart_url = input("Enter Flipkart product URL: ")
+
+    product_a, amazon_price = get_amazon_price(amazon_url)
+    product_f, flipkart_price = get_flipkart_price(flipkart_url)
+
+    if amazon_price is None or flipkart_price is None:
+        print("Error fetching prices")
+        return
+
+    print("\nProduct:", product_a)
+    print("Amazon Price:", amazon_price)
+    print("Flipkart Price:", flipkart_price)
+
+    result = compare_prices(amazon_price, flipkart_price)
+    print("Result:", result)
+
+    save_price(product_a, amazon_price, flipkart_price)
+    print("\nPrice saved to prices.csv")
+
+
+if __name__ == "__main__":
+    main()
